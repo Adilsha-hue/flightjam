@@ -1,0 +1,11 @@
+{
+  "name": "spectra_common",
+  "version": "0.1.0",
+  "description": "Shared frame format and authentication for SPECTRA-SHIELD nodes",
+  "keywords": "lora, hmac, telemetry",
+  "frameworks": "arduino",
+  "platforms": "espressif32",
+  "build": {
+    "srcFilter": "+<*>"
+  }
+}

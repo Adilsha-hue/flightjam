@@ -1,0 +1,19 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Data / outputs
+host/logger/*.db
+host/logger/*.csv
+out/
+*.png
+
+# Local secrets (never commit device PSKs)
+secrets_*.h
+secrets/

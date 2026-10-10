@@ -1,0 +1,11 @@
+item,qty,unit_inr,total_inr,category,vendor_notes
+Heltec WiFi LoRa 32 V4 (ESP32-S3 + SX1262),2,3549,7098,friendly_link,vihaaniotgateway.in
+CC1101 868 MHz module (interferer),2,250,500,interferer,zbotic.in / Robu.in / compoindia (stock varies)
+SMA step attenuator 0-10 dB (1 dB step),1,2500,2500,rf_passives,Synergy Telecom / rfconnector.in
+Fixed SMA attenuators (6/10/20 dB set),4,1500,6000,rf_passives,Synergy Telecom / Dipeshwari (MOQ 5-10)
+2-way power combiner / divider,1,2000,2000,rf_passives,Synergy Telecom
+SMA cables / adapters / pigtails,,,1500,rf_passives,
+RTL-SDR Blog V4 (monitor / verify),1,6028,6028,monitoring,amazon.in
+Breadboard / PSU / enclosure / 3D-printed mounts,,,2000,mech_misc,
+Consumables / misc,,,1500,mech_misc,
+TOTAL,,,,29100,,
