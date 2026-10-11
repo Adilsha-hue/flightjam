@@ -4,6 +4,7 @@ wiring:['hardware-lab.html','Wiring & faults','Inspect connections and simulate 
 flight:['flight-world.html','Flight world','Watch simulated telemetry travel from the RC plane to ground.'],
 code:['implementation-lab.html','Code walkthrough','Step through input, encryption, transport and decoding.'],
 build:['build-setup.html','Parts & firmware','Explore component requirements, antennas and TX/RX source.'],
+design:['board-designer.html','Board designer','Lay out the jammer test board and wire its conducted interferer rig.'],
 learning:['learning-lab.html','Learning lab','Understand authentication, packet loss and replay rejection.'],
 bench:['bench-simulator.html','Original simulator','Explore the original repository’s bench demonstration.']};
 const frames=new Map();

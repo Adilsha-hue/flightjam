@@ -1,0 +1,236 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FlightJam · board designer</title>
+<link rel="stylesheet" href="responsive.css"><script src="lab-integration.js" defer></script>
+<style>
+body{margin:0;background:#eef2f5;color:#172c3b;font:15px system-ui}
+header{background:#172c3b;color:#fff;padding:18px 24px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}h1{font-size:23px;margin:0}
+main{padding:18px;max-width:1600px;margin:auto}
+.tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:15px}
+button{font:inherit;background:#fff;border:1px solid #bdc9d0;border-radius:7px;padding:10px 12px;cursor:pointer}
+button:hover{background:#f2f7f9}button.active{background:#0f766e;color:#fff;border-color:#0f766e}
+button.danger{color:#8a2b1d;border-color:#dcb4ac}
+label.zoom{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #bdc9d0;border-radius:7px;padding:6px 12px}
+a{color:#09645e}
+.layout{display:grid;grid-template-columns:190px minmax(0,1fr) 320px;gap:16px;align-items:start}
+.palette,.side{background:#fff;border:1px solid #c8d5dc;border-radius:12px;padding:14px}
+.side{padding:18px}
+.palette h2,.side h2{margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:#526675}
+.pal{display:flex;flex-direction:column;gap:8px}
+.pal button{display:flex;align-items:center;gap:9px;text-align:left;line-height:1.25}
+.sw{width:14px;height:14px;border-radius:4px;flex:none;border:1px solid rgba(0,0,0,.2)}
+.legend{margin-top:16px;font-size:13px;color:#526675;line-height:1.7}
+.legend b{display:block;margin-bottom:4px;color:#172c3b}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.stage{background:#fafcfd;border:1px solid #c8d5dc;border-radius:12px;overflow:hidden;overscroll-behavior:contain}
+.stage svg{display:block;width:100%;height:auto;touch-action:pan-y}
+.block{cursor:grab}.block:active{cursor:grabbing}
+.block,.port{touch-action:none}
+svg text{font-family:system-ui;pointer-events:none;user-select:none}
+.port{cursor:crosshair}
+.port-ring{transition:r .1s ease}
+.port.compat .port-ring{stroke:#0f766e;stroke-width:3}
+.port.compat .halo{display:block}
+.halo{display:none}
+.side h2{margin-top:0}.side h2:not(:first-of-type){margin-top:22px}
+.side p{line-height:1.6;margin:.4em 0}.side .role{color:#0f766e;font-weight:600}
+.ports{list-style:none;padding:0;margin:10px 0;font-size:14px}
+.ports li{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #dce5ea}
+.status{background:#e2eee8;padding:12px 14px;border-radius:8px;margin-top:16px;line-height:1.6}
+.status.warn{background:#fbeede}
+.empty{color:#7c8b96;font-style:italic}
+.copyok{color:#0f766e;font-weight:600}
+.foot{margin-top:18px;background:#fff;border-radius:10px;padding:16px;line-height:1.65}
+.foot b{color:#172c3b}
+@media(max-width:1180px){.layout{grid-template-columns:168px minmax(0,1fr) 280px}.palette,.side{padding:12px}}
+@media(max-width:1080px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .pal{flex-direction:row;flex-wrap:wrap}
+  .pal button{flex:1 1 150px}
+  .palette .legend{margin-top:12px}
+}
+@media(max-width:760px){
+  .stage{overflow-x:auto}
+  .stage svg{min-width:680px}
+}
+@media(max-width:600px){
+  .tools{position:sticky;top:0;z-index:5;gap:8px;padding:8px 0;background:#eef2f5}
+  .tools button{flex:1 1 calc(50% - 4px)}
+  label.zoom{flex:1 1 100%;justify-content:space-between}
+  label.zoom input{flex:1;min-width:0}
+  .pal{flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}
+  .pal button{flex:0 0 auto;scroll-snap-align:start;white-space:nowrap}
+  .side{padding:14px}
+  .foot{padding:14px}
+}
+</style>
+<header><h1>FlightJam · board designer</h1><span>Conducted interferer test rig · software model</span></header>
+<main>
+<div class="tools">
+  <button id="check">Check rig</button>
+  <button id="copy">Copy layout JSON</button>
+  <button id="del" class="danger">Delete selected</button>
+  <button id="reset">Reset rig</button>
+  <button id="clear">Clear all</button>
+  <label class="zoom">Zoom <input id="zoom" type="range" min="60" max="140" value="100"></label>
+</div>
+<div class="layout">
+  <aside class="palette">
+    <h2>Components</h2>
+    <div class="pal" id="pal"></div>
+    <div class="legend">
+      <b>Wiring</b>
+      <span class="dot" style="background:#c05621"></span>RF path · 50 Ω<br>
+      <span class="dot" style="background:#4a5b8c"></span>Control / logic<br>
+      <span class="dot" style="background:#306db0"></span>Power / USB data
+    </div>
+    <div class="legend">
+      <b>How to build</b>
+      Click a component to place it, drag to move (snaps to grid), then click one pin and a matching pin to wire them. Select anything to inspect it.
+    </div>
+  </aside>
+  <section class="stage">
+    <svg id="scene" viewBox="0 0 1000 640" role="application" aria-label="Drag-and-drop conducted interferer test board designer">
+      <defs>
+        <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+          <path d="M20 0H0V20" fill="none" stroke="#dce5ea" stroke-width="1"/>
+        </pattern>
+      </defs>
+      <rect width="1000" height="640" fill="url(#grid)"/>
+      <g id="wires"></g>
+      <g id="blocks"></g>
+    </svg>
+  </section>
+  <aside class="side">
+    <h2 id="insp-title">Get started</h2>
+    <p class="role" id="insp-role"></p>
+    <div id="insp-body"><p class="empty">Place or select a component to see its role, pins and reference source.</p></div>
+    <div class="status" id="status" role="status">Conducted bench rig loaded. Nothing radiates: the interferer runs into a combiner and attenuator, not an antenna.</div>
+  </aside>
+</div>
+<div class="foot">
+  <b>What this is:</b> a Tinkercad-style drag-and-drop layout tool for the <b>board under test</b> and its <b>conducted</b> interferer test rig — the controller, the 868 MHz RF source, a step attenuator, a 2-way combiner, the DUT telemetry board and an optional inline monitor. Faults are wired through cables and pads.
+  <br><b>What this is not:</b> no RF amplifier, radiating antenna, build instructions, tuning or real-world power/frequency values are produced. Levels and behaviour are illustrative and match the repository's bench model only. This is a local workbench, not an Autodesk Tinkercad project.
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id),svg=$('scene');
+const KINDCOLOR={R:'#c05621',C:'#4a5b8c',W:'#306db0'};
+const KINDNAME={R:'RF path',C:'Control',W:'Power / USB'};
+const BLOCKS={
+ usb:{name:'USB power + control',role:'Bench hub',note:'Bench power, flashing and serial control from the laptop to the rig.',file:'../host/sim/spectra_sim.py',color:'#306db0',
+   ports:[{id:'PWR',label:'PWR',kind:'W',x:176,y:24,side:'right'},{id:'CTRL',label:'CTRL',kind:'C',x:176,y:48,side:'right'},{id:'DATA',label:'DATA',kind:'W',x:176,y:72,side:'right'}]},
+ mcu:{name:'Controller',role:'Sequencer',note:'Runs the test sequence and timing; sets interferer mode and reads back status. Software model only.',file:'../host/sim/spectra_sim.py',color:'#4a5b8c',
+   ports:[{id:'PWR',label:'PWR',kind:'W',x:0,y:24,side:'left'},{id:'CTRL_IN',label:'CTRL',kind:'C',x:0,y:48,side:'left'},{id:'CTRL_OUT',label:'CTRL',kind:'C',x:176,y:48,side:'right'}]},
+ rf:{name:'RF source',role:'Interferer signal · CC1101-class 868 MHz',note:'Generates a conducted 868 MHz test signal for immunity checks. No amplifier or antenna is modelled; the level is set downstream by the attenuator.',file:'bench-simulator.html',color:'#b4532b',
+   ports:[{id:'CTRL',label:'CTRL',kind:'C',x:0,y:48,side:'left'},{id:'RF_OUT',label:'RF OUT',kind:'R',x:176,y:48,side:'right'}]},
+ att:{name:'Step attenuator',role:'Programmable pad',note:'Sets the conducted level so the signal reaches the board under test at a controlled, low level. Keeps the rig non-radiating.',file:'bench-simulator.html',color:'#5b6b78',
+   ports:[{id:'RF_IN',label:'RF IN',kind:'R',x:0,y:48,side:'left'},{id:'RF_OUT',label:'RF OUT',kind:'R',x:176,y:48,side:'right'}]},
+ comb:{name:'2-way combiner',role:'RF combiner',note:'Merges the friendly telemetry path and the conducted interferer onto a single cable to the board under test.',file:'bench-simulator.html',color:'#0f766e',
+   ports:[{id:'A',label:'A',kind:'R',x:0,y:28,side:'left'},{id:'B',label:'B',kind:'R',x:0,y:66,side:'left'},{id:'OUT',label:'OUT',kind:'R',x:176,y:48,side:'right'}]},
+ dut:{name:'DUT telemetry board',role:'Board under test · Heltec V3',note:'The telemetry node under test. Receives the combined conducted path and reports decrypted packets and rejections.',file:'../reference-telemetry/src/main.cpp',color:'#205343',
+   ports:[{id:'RF_IN',label:'RF IN',kind:'R',x:0,y:28,side:'left'},{id:'USB',label:'USB',kind:'W',x:0,y:66,side:'left'}]},
+ mon:{name:'RF monitor / logger',role:'Conducted level monitor',note:'Optional instrument tap on the combined line to log level and timing. Inline and non-radiating.',file:'bench-simulator.html',color:'#6d3fa0',
+   ports:[{id:'RF_IN',label:'RF IN',kind:'R',x:0,y:48,side:'left'}]}
+};
+const BW=176,BH=96,GRID=20;
+function defaults(){
+  const blocks=[
+    {uid:'usb',type:'usb',x:40,y:40},
+    {uid:'mcu',type:'mcu',x:280,y:40},
+    {uid:'rf',type:'rf',x:520,y:40},
+    {uid:'att',type:'att',x:760,y:40},
+    {uid:'comb',type:'comb',x:760,y:300},
+    {uid:'dut',type:'dut',x:520,y:300},
+    {uid:'mon',type:'mon',x:760,y:520}
+  ];
+  const wires=[
+    ['usb','PWR','mcu','PWR'],['usb','CTRL','mcu','CTRL_IN'],['mcu','CTRL_OUT','rf','CTRL'],
+    ['rf','RF_OUT','att','RF_IN'],['att','RF_OUT','comb','A'],['dut','RF_IN','comb','B'],
+    ['comb','OUT','mon','RF_IN'],['dut','USB','usb','DATA']
+  ].map(([au,ap,bu,bp])=>({uid:'w'+Math.random().toString(36).slice(2,8),a:{uid:au,port:ap},b:{uid:bu,port:bp}}));
+  return {blocks,wires};
+}
+let {blocks,wires}=defaults();
+let selected=null,pending=null,drag=null,seq=1;
+function def(type){return BLOCKS[type]}
+function portAt(uid,pid){const b=blocks.find(x=>x.uid===uid);if(!b)return null;const p=def(b.type).ports.find(p=>p.id===pid);if(!p)return null;return{b,port:p,x:b.x+p.x,y:b.y+p.y,side:p.side,kind:p.kind,color:def(b.type).color,name:def(b.type).name}}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function wirePath(p1,p2){const s1=p1.side==='right'?24:-24,s2=p2.side==='right'?24:-24,my=(p1.y+p2.y)/2;return `M${p1.x} ${p1.y}L${p1.x+s1} ${p1.y}L${p1.x+s1} ${my}L${p2.x+s2} ${my}L${p2.x+s2} ${p2.y}L${p2.x} ${p2.y}`}
+function render(){
+  $('wires').innerHTML=wires.map(w=>{const a=portAt(w.a.uid,w.a.port),b=portAt(w.b.uid,w.b.port);if(!a||!b)return'';const on=selected&&selected.kind==='wire'&&selected.uid===w.uid;return `<path d="${wirePath(a,b)}" fill="none" stroke="${on?'#0f766e':KINDCOLOR[a.kind]}" stroke-width="${on?6:4}" stroke-linejoin="round" opacity="${on?1:.9}" data-wire="${w.uid}" style="cursor:pointer"/>`}).join('');
+  const blockMarkup=blocks.map(b=>{const d=def(b.type),sel=selected&&selected.kind==='block'&&selected.uid===b.uid;
+    return `<g class="block" data-uid="${b.uid}" transform="translate(${b.x} ${b.y})"><rect x="4" y="6" width="${BW}" height="${BH}" rx="12" fill="#172c3b" opacity=".10"/><rect width="${BW}" height="${BH}" rx="12" fill="${d.color}" stroke="${sel?'#0f766e':'#0b1f2b'}" stroke-width="${sel?4:2}"/><rect width="${BW}" height="24" rx="12" fill="#ffffff" opacity=".12"/><rect x="12" y="12" width="9" height="9" rx="3" fill="#fff" opacity=".85"/><text x="30" y="21" font-size="12" fill="#fff" opacity=".92">${esc(d.role)}</text><text x="12" y="56" font-size="14" fill="#fff" font-weight="600">${esc(d.name)}</text><text x="12" y="74" font-size="11" fill="#fff" opacity=".8">${b.type.toUpperCase()} · ${esc(d.role.split(' ·')[0])}</text></g>`}).join('');
+  const portMarkup=blocks.map(b=>{const d=def(b.type);return d.ports.map(p=>{const compat=pending&&pending.uid!==b.uid&&pending.kind===p.kind;
+      const cx=b.x+p.x,cy=b.y+p.y;
+      return `<g class="port ${compat?'compat':''}" data-port="1" data-uid="${b.uid}" data-pid="${p.id}" data-kind="${p.kind}"><circle class="halo" cx="${cx}" cy="${cy}" r="15" fill="${KINDCOLOR[p.kind]}" opacity=".18"/><circle class="port-ring" cx="${cx}" cy="${cy}" r="7" fill="#fff" stroke="${KINDCOLOR[p.kind]}" stroke-width="2.5"/><text x="${p.side==='right'?cx-14:cx+14}" y="${cy+4}" text-anchor="${p.side==='right'?'end':'start'}" font-size="11" fill="#526675">${esc(p.label)}</text></g>`}).join('')}).join('');
+  $('blocks').innerHTML=blockMarkup+portMarkup;
+  inspector();
+}
+function svgPoint(e){const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;return pt.matrixTransform(svg.getScreenCTM().inverse())}
+function inspector(){
+  if(selected&&selected.kind==='block'){const b=blocks.find(x=>x.uid===selected.uid);if(b){const d=def(b.type);
+    $('insp-title').textContent=d.name;$('insp-role').textContent=d.role;
+    $('insp-body').innerHTML=`<p>${esc(d.note)}</p><h3 style="margin:14px 0 4px;font-size:13px;text-transform:uppercase;color:#526675">Pins</h3><ul class="ports">${d.ports.map(p=>`<li><span>${esc(p.label)}</span><span><span class="dot" style="background:${KINDCOLOR[p.kind]}"></span>${KINDNAME[p.kind]}</span></li>`).join('')}</ul><p><a href="${d.file}">Open reference source</a></p>`;
+    return}}
+  if(selected&&selected.kind==='wire'){const w=wires.find(x=>x.uid===selected.uid);if(w){const a=portAt(w.a.uid,w.a.port),b=portAt(w.b.uid,w.b.port);
+    $('insp-title').textContent='Connection';$('insp-role').textContent=a&&b?KINDNAME[a.kind]:'';
+    $('insp-body').innerHTML=`<p>${a?esc(a.name+' · '+a.port.label):'?'} &rarr; ${b?esc(b.name+' · '+b.port.label):'?'}</p><p class="empty">${esc(a&&b?w.message||'Conducted '+KINDNAME[a.kind].toLowerCase():'')}</p>`;
+    return}}
+  $('insp-title').textContent='Get started';$('insp-role').textContent='';
+  $('insp-body').innerHTML='<p class="empty">Place or select a component to see its role, pins and reference source.</p>';
+}
+function addWire(a,b){if(a.uid===b.uid||a.kind!==b.kind)return;const dup=wires.some(w=>(w.a.uid===a.uid&&w.a.port===a.port&&w.b.uid===b.uid&&w.b.port===b.port)||(w.a.uid===b.uid&&w.a.port===b.port&&w.b.uid===a.uid&&w.b.port===a.port));if(dup)return;wires.push({uid:'w'+Math.random().toString(36).slice(2,8),a:{uid:a.uid,port:a.port},b:{uid:b.uid,port:b.port}})}
+function freeSpot(){for(let y=40;y<560;y+=GRID)for(let x=40;x<820;x+=GRID){if(!blocks.some(b=>Math.abs(b.x-x)<BW&&Math.abs(b.y-y)<BH))return{x,y}}return{x:40,y:40}}
+function addBlock(type){const s=freeSpot();const uid=def(type)?type+'-'+(seq++):type;blocks.push({uid,type,x:s.x,y:s.y});selected={kind:'block',uid};render()}
+function removeSelected(){
+  if(!selected)return;
+  if(selected.kind==='block'){blocks=blocks.filter(b=>b.uid!==selected.uid);wires=wires.filter(w=>w.a.uid!==selected.uid&&w.b.uid!==selected.uid)}
+  else wires=wires.filter(w=>w.uid!==selected.uid);
+  selected=null;render();
+}
+$('pal').innerHTML='';
+for(const [type,d] of Object.entries(BLOCKS)){const btn=document.createElement('button');btn.innerHTML=`<span class="sw" style="background:${d.color}"></span><span>${esc(d.name)}</span>`;btn.onclick=()=>addBlock(type);$('pal').append(btn)}
+svg.addEventListener('pointerdown',e=>{
+  const portEl=e.target.closest('[data-port]');
+  if(portEl){startConnect(portEl.dataset.uid,portEl.dataset.pid);return}
+  const blockEl=e.target.closest('[data-uid]');
+  const wireEl=e.target.closest('[data-wire]');
+  if(wireEl){selected={kind:'wire',uid:wireEl.dataset.wire};render();return}
+  if(blockEl){selected={kind:'block',uid:blockEl.dataset.uid};startDrag(blockEl.dataset.uid,e);render();return}
+  selected=null;render();
+});
+function startDrag(uid,e){const b=blocks.find(x=>x.uid===uid);const p=svgPoint(e);drag={uid,dx:p.x-b.x,dy:p.y-b.y};svg.setPointerCapture(e.pointerId)}
+svg.addEventListener('pointermove',e=>{
+  if(!drag)return;const p=svgPoint(e);const b=blocks.find(x=>x.uid===drag.uid);
+  b.x=Math.max(0,Math.min(1000-BW,Math.round((p.x-drag.dx)/GRID)*GRID));
+  b.y=Math.max(0,Math.min(640-BH,Math.round((p.y-drag.dy)/GRID)*GRID));render();
+});
+svg.addEventListener('pointerup',()=>drag=null);
+svg.addEventListener('pointercancel',()=>drag=null);
+function startConnect(uid,pid){
+  const p=portAt(uid,pid);if(!p)return;
+  if(pending&&(pending.uid!==uid||pending.portid!==pid)){const a=portAt(pending.uid,pending.portid);addWire({uid:a.b.uid,port:a.port.id,kind:a.kind},{uid,port:pid,kind:p.kind});pending=null;render();return}
+  if(pending&&pending.uid===uid&&pending.portid===pid){pending=null;render();return}
+  pending={uid,portid:pid,kind:p.kind};render();
+}
+window.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){removeSelected();e.preventDefault()}else if(e.key==='Escape'){pending=null;selected=null;render()}});
+$('del').onclick=removeSelected;
+$('clear').onclick=()=>{blocks=[];wires=[];selected=null;pending=null;render();say('Canvas cleared.','')};
+$('reset').onclick=()=>{const d=defaults();blocks=d.blocks;wires=d.wires;selected=null;pending=null;say('Conducted bench rig restored.','')};
+$('zoom').oninput=()=>{svg.style.width=$('zoom').value+'%'};
+$('copy').onclick=async()=>{const data={blocks:blocks.map(b=>({type:b.type,x:b.x,y:b.y})),wires:wires.map(w=>({a:w.a,b:w.b}))};try{await navigator.clipboard.writeText(JSON.stringify(data,null,2));say('Layout JSON copied to clipboard.','copyok')}catch(e){say('Clipboard blocked; layout is '+blocks.length+' blocks, '+wires.length+' wires.','')}};
+function say(msg,cls){const s=$('status');s.className='status'+(cls==='warn'?' warn':'');s.innerHTML=cls==='copyok'?`<span class="copyok">${esc(msg)}</span>`:esc(msg)}
+$('check').onclick=()=>{
+  const has=(au,ap,bu,bp)=>wires.some(w=>(w.a.uid===au&&w.a.port===ap&&w.b.uid===bu&&w.b.port===bp)||(w.a.uid===bu&&w.a.port===bp&&w.b.uid===au&&w.b.port===ap));
+  const issues=[];
+  if(!blocks.find(b=>b.type==='dut'))issues.push('No board under test (DUT) placed.');
+  if(has('rf','RF_OUT','dut','RF_IN')||has('rf','RF_OUT','comb','B'))issues.push('RF source feeds the DUT/combiner without the step attenuator in series.');
+  if(!has('rf','RF_OUT','att','RF_IN')&&blocks.find(b=>b.type==='rf'))issues.push('RF source is not wired into the step attenuator.');
+  if(!has('att','RF_OUT','comb','A'))issues.push('Attenuator output is not wired to combiner input A.');
+  if(!has('dut','RF_IN','comb','B'))issues.push('DUT RF input is not wired to combiner input B.');
+  if(!has('mcu','CTRL_OUT','rf','CTRL'))issues.push('Controller is not controlling the RF source.');
+  for(const b of blocks){if(!wires.some(w=>w.a.uid===b.uid||w.b.uid===b.uid))issues.push('Unconnected component: '+def(b.type).name+'.')}
+  if(!issues.length)say('Rig OK · RF path: source → attenuator → combiner → DUT, controller wired, conducted only, nothing radiates.','');
+  else say('Rig checks ('+issues.length+'): '+issues.join(' '),'warn');
+};
+render();
+</script></html>
