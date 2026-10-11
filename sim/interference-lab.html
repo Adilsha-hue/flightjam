@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FlightJam · interference lab</title>
+<link rel="stylesheet" href="responsive.css"><script src="lab-integration.js" defer></script><style>
+body{font:16px system-ui;margin:0;background:#101923;color:#e7eef6}main{max-width:1080px;margin:auto;padding:28px}h1,h2{font-weight:600}p{line-height:1.6;color:#bccddd}small{color:#bccddd}a{color:#9fe1d2}
+.panel{background:#192737;padding:20px;border-radius:12px;margin:16px 0}.row{display:flex;gap:20px;flex-wrap:wrap}.row>.panel{flex:1;min-width:240px}
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}button,select{font:inherit;padding:12px;border-radius:8px;margin:4px 0}button{background:#9fe1d2;border:0;color:#122b27;cursor:pointer}button[aria-pressed=true]{background:#ef8d8d;color:#2a1414}select{background:#e7eef6;color:#101923}label{color:#e7eef6}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0}.stat{padding:16px;background:#192737;border-radius:12px}.stat span{color:#bccddd;font-size:14px}.stat strong{display:block;font-size:26px;margin-top:6px;color:#9fe1d2}
+.lamp{display:inline-block;width:11px;height:11px;border-radius:50%;background:#8897aa;vertical-align:middle}.lamp.on{background:#ef8d8d;box-shadow:0 0 12px #ef8d8d}.lamp.ok{background:#93dbc5}
+.track{height:12px;background:#34495f;border-radius:8px;overflow:hidden;margin:8px 0}.track span{display:block;height:100%;background:#e6a864;transition:width .3s}
+.chart{width:100%;height:auto;display:block;background:#111b23;border-radius:12px}
+.checks{display:flex;gap:16px;flex-wrap:wrap}.checks label{display:flex;align-items:center;gap:8px;background:#111b23;padding:8px 12px;border-radius:8px;cursor:pointer}
+.logwrap{max-height:240px;overflow:auto}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:10px;border-bottom:1px solid #34495f}
+.flow{text-align:center;padding:14px;color:#9fe1d2}.hint{font-size:14px;color:#bccddd}input[type=range]{width:100%;accent-color:#e6a864}.disclaimer{border-left:4px solid #e6c987;padding-left:14px}
+@media(max-width:600px){main{padding:16px}.stat strong{font-size:22px}.checks label{flex-basis:100%}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<main><h1>Interference resilience lab</h1>
+<p><a href="learning-lab.html">← Learning lab</a> · <a href="board-designer.html">Board designer</a> · <a href="bench-simulator.html">Original simulator</a></p>
+<p class="disclaimer">A software teaching model of how an interfered radio link degrades and how common countermeasures restore it. Every dial here is an <strong>abstract demo setting</strong> — not RF power, not a frequency, not a calibrated hardware parameter. Nothing in this page transmits a radio signal or describes a jamming device.</p>
+
+<section class="panel"><h2>Simulated interference source</h2>
+<div class="toolbar">
+<button id="jam" aria-pressed="false">Interference source: OFF</button>
+<span><span id="lamp" class="lamp"></span> <b id="jamState">OFF</b></span>
+<label for="pattern">Pattern</label>
+<select id="pattern"><option value="continuous">Continuous</option><option value="burst">Burst · 40% duty</option><option value="swept">Sweeping</option></select>
+</div>
+<label for="strength">Disturbance strength: <b id="strengthValue">60 / 100</b></label>
+<input id="strength" type="range" min="0" max="100" value="60">
+<div class="track"><span id="strengthBar" style="width:60%"></span></div>
+<p class="hint">Abstract interference index only. It scales a packet-erasure model; it is not a wattage, gain or dBm figure.</p></section>
+
+<section class="panel"><h2>Countermeasures</h2>
+<div class="checks">
+<label><input type="checkbox" id="diversity"> Channel diversity (frequency agility)</label>
+<label><input type="checkbox" id="fec"> Forward error correction</label>
+<label><input type="checkbox" id="arq"> Retransmission (ARQ)</label>
+<label><input type="checkbox" id="auto"> Auto-mitigate on detection</label>
+</div>
+<p class="hint">Diversity avoids part of the interference, FEC repairs some damaged frames, ARQ repeats missing ones at the cost of latency. Auto-mitigate engages all three once the link is detected as disturbed.</p></section>
+
+<div class="toolbar"><button id="run">Start link</button><button id="guided">Run scenario</button><button id="reset">Reset</button><span id="statusText" role="status">Paused</span></div>
+
+<div class="stats">
+<div class="stat"><span>Interference</span><strong id="mJam">off</strong></div>
+<div class="stat"><span>Link quality</span><strong id="mQuality">100%</strong></div>
+<div class="stat"><span>Delivery (rolling)</span><strong id="mDelivery">100%</strong></div>
+<div class="stat"><span>Goodput (proxy)</span><strong id="mGoodput">100%</strong></div>
+<div class="stat"><span>Latency</span><strong id="mLatency">40 ms</strong></div>
+<div class="stat"><span>Detected</span><strong id="mDetected">no</strong></div>
+</div>
+
+<h2>Link quality over time</h2>
+<svg id="chart" class="chart" viewBox="0 0 700 200" role="img" aria-label="Link quality and interference index over time">
+<path d="M45 15V160H680" fill="none" stroke="#8d9fb5"/>
+<text x="2" y="20" fill="#bccddd">100</text><text x="10" y="160" fill="#bccddd">0</text>
+<text x="45" y="188" fill="#bccddd">start</text><text x="600" y="188" fill="#bccddd">latest tick</text>
+<path id="jamPath" fill="none" stroke="#ef8d8d" stroke-width="2" opacity="0.8"/>
+<path id="qualityPath" fill="none" stroke="#9fe1d2" stroke-width="3"/></svg>
+<p class="hint"><span style="color:#9fe1d2">— link quality</span> · <span style="color:#ef8d8d">— interference index</span></p>
+
+<section class="panel" id="presentation" role="status">Ready. Start the link, then switch the interference source on to watch quality collapse — and turn on countermeasures to watch it recover.</section>
+
+<details class="panel"><summary>Event log</summary><div class="logwrap"><table><thead><tr><th>Tick</th><th>Event</th><th>Detail</th></tr></thead><tbody id="events"></tbody></table></div></details>
+
+<h2>How a resilient link is built</h2>
+<div class="row"><section class="panel"><h2>Detect</h2><p>Watch link-quality and error-rate indicators so a disturbance is noticed quickly. A detected drop is what lets mitigation engage automatically instead of silently losing telemetry.</p></section><section class="panel"><h2>Survive</h2><p>Frequency agility and error-correcting coding keep data flowing through partial interference. Retransmission trades latency for delivery when a frame is missed.</p></section></div>
+<div class="row"><section class="panel"><h2>Trust</h2><p>Even under heavy disturbance, authentication and freshness checks stop altered or replayed frames from being accepted (see the <a href="learning-lab.html">Learning lab</a>).</p></section><section class="panel"><h2>Recover</h2><p>Fallback behavior matters: hold the last verified state, alarm on staleness, and restore full delivery as soon as the disturbance clears.</p></section></div>
+<p class="flow">TX node → simulated channel → interfered link → countermeasures → RX node</p>
+
+<h2>Model assumptions &amp; limits</h2>
+<table><thead><tr><th>Quantity</th><th>What it is</th><th>What it is not</th></tr></thead><tbody>
+<tr><td>Disturbance strength</td><td>An abstract 0–100 index driving packet loss</td><td>RF power, gain, dBm or a real emitter</td></tr>
+<tr><td>Link quality</td><td>An illustrative 0–100 score</td><td>A measured SNR / RSSI reading</td></tr>
+<tr><td>Delivery &amp; goodput</td><td>Rolling success and overhead-adjusted throughput</td><td>A calibrated radio throughput figure</td></tr>
+<tr><td>Countermeasures</td><td>Concept-level toggles</td><td>Implemented waveform or hardware design</td></tr>
+</tbody></table>
+<p class="disclaimer">This lab exists to design and harden a link against interference. It intentionally omits power, frequency, antenna and targeting detail, and is not a blueprint for any real transmitting device.</p>
+<small>Software model only. No radio hardware is controlled or simulated at the signal level.</small></main>
+<script>
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const N=180;
+let tick=0,running=false,timer=null,interference=false,pattern='continuous',strength=60;
+const mit={diversity:false,fec:false,arq:false,auto:false};
+let detected=false,detectTick=null,disturbStart=null;
+let hist=[],outcomes=[],counters={sent:0,delivered:0,recovered:0,lost:0},lastLatency=40;
+let guided=null,guidedStart=0;
+
+function interferenceLevel(){
+  if(!interference)return 0;
+  if(pattern==='continuous')return strength;
+  if(pattern==='burst')return (tick%10)<4?strength:0;
+  if(pattern==='swept')return Math.round(strength*(0.5+0.5*Math.sin(tick/5)));
+  return strength;
+}
+function mitigationFactor(){return mit.diversity?0.45:1}
+function overhead(){return (mit.fec?0.22:0)+(mit.arq?0.18:0)}
+function addEvent(event,detail){const tr=document.createElement('tr');for(const v of[tick,event,detail]){const td=document.createElement('td');td.textContent=v;tr.appendChild(td)}$('events').prepend(tr);while($('events').children.length>100)$('events').lastChild.remove()}
+function syncChecks(){for(const k of['diversity','fec','arq'])$(k).checked=mit[k]}
+function setMit(k,on){if(mit[k]===on)return;mit[k]=on;syncChecks();addEvent('Countermeasure',(on?'enabled ':'disabled ')+k)}
+function setInterference(on){if(interference===on)return;interference=on;if(on){disturbStart=tick;addEvent('Interference','source ON ('+pattern+', strength '+strength+')')}else{addEvent('Interference','source OFF')}updateJammer()}
+function updateJammer(){$('jam').textContent='Interference source: '+(interference?'ON':'OFF');$('jam').setAttribute('aria-pressed',String(interference));$('strengthValue').textContent=$('strength').value+' / 100';$('strengthBar').style.width=$('strength').value+'%'}
+function rollingRate(){if(!outcomes.length)return 1;const good=outcomes.filter(o=>o!=='lost').length;return good/outcomes.length}
+function renderChart(){const pts=hist.slice(-N);const x=i=>45+i/Math.max(1,pts.length-1)*635;const y=v=>160-v/100*145;$('qualityPath').setAttribute('d',pts.map((p,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(p.q).toFixed(1)).join(' '));$('jamPath').setAttribute('d',pts.map((p,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(p.i).toFixed(1)).join(' '))}
+function render(){
+  $('mJam').textContent=interference?(pattern+' · '+strength):'off';
+  const q=hist.length?hist[hist.length-1].q:100;
+  $('mQuality').textContent=q.toFixed(0)+'%';
+  const rate=rollingRate();$('mDelivery').textContent=(rate*100).toFixed(0)+'%';
+  $('mGoodput').textContent=(rate*(1-overhead())*100).toFixed(0)+'%';
+  $('mLatency').textContent=Math.round(lastLatency)+' ms';
+  $('mDetected').textContent=detected?('yes'+(detectTick&&disturbStart!=null?' · '+(detectTick-disturbStart)+' ticks':'')).toString():'no';
+  $('lamp').className='lamp'+(detected?' on':(interference?'':' ok'));
+  $('jamState').textContent=!interference?'OFF':detected?'ON · detected':'ON';
+  renderChart();
+}
+function step(){
+  tick++;const lvl=interferenceLevel();const eff=lvl*mitigationFactor();
+  const quality=clamp(100-eff+(Math.random()-0.5)*6,0,100);
+  let loss=clamp(Math.pow((100-quality)/100,1.4)+(Math.random()-0.5)*0.1,0,0.98);
+  if(mit.fec)loss*=0.35;
+  let attempts=1,delivered=false,recovered=false;
+  if(Math.random()<1-loss)delivered=true;
+  else if(mit.arq){attempts++;if(Math.random()<0.6){delivered=true;recovered=true}else{attempts++;if(Math.random()<0.5){delivered=true;recovered=true}}}
+  lastLatency=40+(attempts-1)*35;
+  const nowDetected=eff>12;
+  if(nowDetected&&!detected){detected=true;detectTick=tick;addEvent('Detected','disturbance crossed threshold')}
+  else if(!nowDetected&&detected){detected=false;detectTick=null;addEvent('Cleared','disturbance below threshold')}
+  if(mit.auto&&detected){setMit('diversity',true);setMit('fec',true);setMit('arq',true)}
+  counters.sent++;if(delivered)counters.delivered++;else counters.lost++;if(recovered)counters.recovered++;
+  outcomes.push(delivered?(recovered?'recovered':'ok'):'lost');if(outcomes.length>N)outcomes.shift();
+  hist.push({q:quality,i:lvl});if(hist.length>N)hist.shift();
+  render();
+}
+function start(){if(running)return;running=true;timer=setInterval(step,400);$('run').textContent='Pause link';$('statusText').textContent='Running · 2.5 frames / second'}
+function pause(){clearInterval(timer);timer=null;running=false;$('run').textContent='Start link';$('statusText').textContent='Paused'}
+function stopGuided(){clearInterval(guided);guided=null;$('guided').disabled=false}
+function reset(){stopGuided();pause();setInterference(false);interference=false;disturbStart=null;detected=false;detectTick=null;tick=0;hist=[];outcomes=[];counters={sent:0,delivered:0,recovered:0,lost:0};lastLatency=40;for(const k of['diversity','fec','arq','auto'])mit[k]=false;syncChecks();$('events').textContent='';$('pattern').value='continuous';pattern='continuous';$('strength').value=60;strength=60;updateJammer();$('presentation').textContent='Session reset. Start the link or run the scenario.';render()}
+$('run').onclick=()=>{stopGuided();if(running)pause();else start()};
+$('jam').onclick=()=>{stopGuided();setInterference(!interference)};
+$('strength').oninput=()=>{strength=+$('strength').value;updateJammer();render()};
+$('pattern').onchange=()=>{pattern=$('pattern').value;if(interference)addEvent('Pattern',pattern)};
+for(const k of['diversity','fec','arq'])$(k).onchange=()=>setMit(k,$(k).checked);
+$('auto').onchange=()=>{mit.auto=$('auto').checked;addEvent('Countermeasure','auto-mitigate '+(mit.auto?'enabled':'disabled'))};
+$('reset').onclick=reset;
+$('guided').onclick=()=>{reset();$('guided').disabled=true;$('strength').value=80;strength=80;updateJammer();start();guidedStart=Date.now();let phase=-1;guided=setInterval(()=>{const p=Math.floor((Date.now()-guidedStart)/4000);if(p===phase)return;phase=p;if(p===0){$('presentation').textContent='1 / 5 · Clean link: frames arrive continuously, quality stays high.'}else if(p===1){setInterference(true);pattern='continuous';$('pattern').value='continuous';$('presentation').textContent='2 / 5 · Interference on, no countermeasures: quality collapses and delivery falls.'}else if(p===2){$('presentation').textContent='3 / 5 · The drop is detected — this is the trigger for automatic mitigation.'}else if(p===3){setMit('diversity',true);setMit('fec',true);setMit('arq',true);$('presentation').textContent='4 / 5 · Countermeasures engaged: diversity, coding and retransmission pull delivery back up (at some latency cost).'}else if(p===4){$('presentation').textContent='5 / 5 · Interference still present, but the link stays usable. Inspect the chart and event log.'}else{stopGuided();$('presentation').textContent='Scenario complete. Try swept/burst patterns, or toggle auto-mitigate and reset.'}},100)};
+updateJammer();render();
+</script></html>

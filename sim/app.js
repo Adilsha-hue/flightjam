@@ -6,6 +6,7 @@ code:['implementation-lab.html','Code walkthrough','Step through input, encrypti
 build:['build-setup.html','Parts & firmware','Explore component requirements, antennas and TX/RX source.'],
 design:['board-designer.html','Board designer','Lay out the jammer test board and wire its conducted interferer rig.'],
 learning:['learning-lab.html','Learning lab','Understand authentication, packet loss and replay rejection.'],
+interference:['interference-lab.html','Interference lab','Study simulated interference and the countermeasures that keep telemetry alive.'],
 bench:['bench-simulator.html','Original simulator','Explore the original repository’s bench demonstration.']};
 const frames=new Map();
 function navigate(){const requested=location.hash.slice(1);const key=Object.hasOwn(sections,requested)?requested:'assembly';if(key!==requested){history.replaceState(null,'','#'+key)}const [file,title,description]=sections[key];document.title=title+' · FlightJam';document.getElementById('view-title').textContent=title;document.getElementById('view-description').textContent=description;for(const link of document.querySelectorAll('[data-view]')){if(link.dataset.view===key)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current')}if(!frames.has(key)){const frame=document.createElement('iframe');frame.title=title;frame.src=file;document.getElementById('views').append(frame);frames.set(key,frame)}for(const [id,frame]of frames)frame.hidden=id!==key;}
