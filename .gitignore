@@ -5,6 +5,7 @@
 
 # Python
 .venv/
+.venv-build/
 __pycache__/
 *.pyc
 
